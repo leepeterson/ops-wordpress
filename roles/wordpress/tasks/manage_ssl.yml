@@ -1,0 +1,33 @@
+---
+
+- name: Create WordPress ACME challenge directory
+  file:
+    path: '{{ wordpress__pki__acme_challenge_dir }}'
+    state: 'directory'
+    owner: '{{ wordpress__pki__acme_user }}'
+    group: '{{ wordpress__pki__acme_group }}'
+    mode: '0750'
+  when: wordpress__ssl_provider == 'letsencrypt'
+
+- name: Append PKI ACME group to WordPress user
+  user:
+    name: '{{ wordpress__user_name }}'
+    append: 'true'
+    groups: '{{ wordpress__pki__acme_group }}'
+  when: wordpress__ssl_provider == 'letsencrypt'
+
+- name: Append PKI ACME group to nginx user
+  user:
+    name: '{{ wordpress__nginx__user }}'
+    append: 'true'
+    groups: '{{ wordpress__pki__acme_group }}'
+  when: wordpress__ssl_provider == 'letsencrypt'
+
+- name: Restart nginx to pickup new user group
+  service:
+    name: 'nginx'
+    state: 'restarted'
+  when: wordpress__ssl_provider == 'letsencrypt'
+
+- name: Run PKI realm configuration
+  command: '/usr/local/lib/pki/pki-realm run -n "{{ wordpress__pki__realm }}"'

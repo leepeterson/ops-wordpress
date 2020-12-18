@@ -1,0 +1,37 @@
+---
+
+# ---- Install and configure Varnish server ----
+
+- name: Install required packages
+  apt:
+    name: '{{ item }}'
+    state: 'present'
+    install_recommends: False
+  with_flattened:
+    - 'varnish'
+
+- name: Allow webadmins to reload varnish using sudo
+  template:
+    src: 'etc/sudoers.d/varnish_webadmins.j2'
+    dest: '/etc/sudoers.d/varnish_webadmins'
+    owner: 'root'
+    group: 'root'
+    mode: '0440'
+
+- name: Configure Varnish service
+  template:
+    src: 'etc/systemd/system/varnish.service.j2'
+    dest: '/etc/systemd/system/varnish.service'
+    owner: 'root'
+    group: 'root'
+    mode: '0644'
+  notify: [ 'Reload systemd daemon' ]
+
+- name: Configure default.vcl for Varnish
+  template:
+    src: 'etc/varnish/default.vcl.j2'
+    dest: '/etc/varnish/default.vcl'
+    owner: 'root'
+    group: 'root'
+    mode: '0644'
+  notify: [ 'Restart varnish' ]

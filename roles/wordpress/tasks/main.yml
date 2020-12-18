@@ -1,0 +1,57 @@
+---
+
+# ---- Install and configure WordPress ----
+
+- name: Append WordPress system group to nginx user
+  user:
+    name: '{{ wordpress__nginx__user }}'
+    append: 'true'
+    groups: '{{ wordpress__user_group }}'
+
+- name: Create WordPress directory
+  file:
+    path: '{{ wordpress__root }}'
+    state: 'directory'
+    owner: '{{ wordpress__user_name }}'
+    group: '{{ wordpress__user_group }}'
+    mode: '0755'
+    follow: True
+
+- name: Check if WordPress is installed
+  command: 'wp core is-installed'
+  become_user: '{{ wordpress__user_name }}'
+  args:
+    chdir: '{{ wordpress__root }}'
+  register: wordpress__register_installed
+  changed_when: False
+  failed_when: False
+
+- include: 'install_{{ wordpress__install_type }}.yml'
+  when: wordpress__register_installed is defined and wordpress__register_installed.rc == 1
+
+- name: Setup WordPress permalink structure
+  command: 'wp rewrite structure {{ wordpress__permalink_structure }}'
+  become_user: '{{ wordpress__user_name }}'
+  args:
+    chdir: '{{ wordpress__root }}'
+
+- name: Install custom script to run wp-cron with WP-CLI
+  template:
+    src: 'usr/local/lib/run-wp-cron.j2'
+    dest: '/usr/local/lib/run-wp-cron'
+    owner: 'root'
+    group: 'root'
+    mode: '0755'
+
+- name: Schedule regular calls to wp-cron using WP-CLI
+  cron:
+    name: 'Run wp-cron for {{ wordpress__root }}'
+    job: 'test -x /usr/local/lib/run-wp-cron && /usr/local/lib/run-wp-cron {{ wordpress__root }} || true'
+    user: '{{ wordpress__user_name }}'
+    cron_file: '{{ wordpress__domain | replace(".", "_") }}'
+    minute: '{{ wordpress__cron_minute }}'
+    hour: '{{ wordpress__cron_hour }}'
+  when: wordpress__cron_enabled|bool
+
+- include: manage_ssl.yml
+  when: wordpress__ssl|bool
